@@ -5,10 +5,19 @@ use near_sdk::collections::{LazyOption, UnorderedMap};
 use near_sdk::json_types::{U128};
 use near_sdk::serde::{Serialize, Deserialize};
 use near_sdk::{
-    env, near_bindgen, require, AccountId, BorshStorageKey, PanicOnDefault, PromiseOrValue, Promise, Balance
+    env, near_bindgen, require, AccountId, BorshStorageKey, PanicOnDefault, Promise, Balance
 };
 use near_sdk_contract_tools::owner::OwnerExternal;
 use near_sdk_contract_tools::{owner::Owner, Owner};
+
+pub use crate::resolver::*;
+pub use crate::ipfs::*;
+pub use crate::text_records::*;
+
+
+mod resolver; 
+mod ipfs;
+mod text_records;
 
 //The Json token is what will be returned from view calls. 
 #[derive(Serialize, Deserialize)]
@@ -39,95 +48,50 @@ enum StorageKey {
 
 #[near_bindgen]
 impl Contract {
-    /// Initializes the contract owned by `owner_id` with
-    /// default metadata (for example purposes only).
+    
     #[init]
-    pub fn new_default_meta(owner_id: AccountId) -> Self {
-        let mut contract = Self::new(
-            
-        );
-        Owner::init(&mut contract, &owner_id);
-        contract
-    }
-
-    #[init]
-    pub fn new() -> Self {
+    pub fn new(owner_id: AccountId) -> Self {
         require!(!env::state_exists(), "Already initialized");
         let registry = env::predecessor_account_id();
-        Self {
+        
+        let mut contract = Self {
             registry,
             address_by_networks: UnorderedMap::new(StorageKey::AddressByNetworks),
             ipfs: LazyOption::new(StorageKey::Ipfs, None),
             text_records: HashMap::new(),
             icon: LazyOption::new(StorageKey::Icon, Some(&DATA_IMAGE_SVG_NAVARA_ICON.to_owned())),
-        }
-    }
-
-    pub fn resolve(&self, network: String) -> JsonToken {
-        JsonToken {
-            network: network.to_owned(),
-            address: self.address_by_networks.get(&network)
-        }
-    }
-
-    pub fn set_addresses(&mut self, addresses: HashMap<String, String>) {
-        Self::require_owner();
-        Self::require_owner();
-        for (key, value) in addresses {
-            self.address_by_networks.insert(&key, &value);
-        }
-        assert!(self.text_records.len() <= 10, "Too many records")
-    }
-
-    pub fn get_addresses(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<JsonToken> {
-        let start = u128::from(from_index.unwrap_or(U128(0)));
-        self.address_by_networks.keys()
-        .skip(start as usize) 
-        .take(limit.unwrap_or(50) as usize) 
-            //we'll map the token IDs which are strings into Json Tokens
-            .map(|network| self.resolve(network.clone()))
-            //since we turned the keys into an iterator, we need to turn it back into a vector to return
-            .collect()
+        };
+        Owner::init(&mut contract, &owner_id);
+        contract
     }
 
     fn only_registry(&self) {
         assert_eq!(env::predecessor_account_id(), self.registry, "Only registry")
     }
 
-    pub fn owner_changed(&mut self, new_owner: AccountId) -> PromiseOrValue<bool> {
-        self.only_registry();
-        let signer = env::signer_account_id();
-        let previous_owner = self.own_get_owner().unwrap();
-        assert_ne!(signer, previous_owner, "Owner not changed");
+    pub fn clear(&mut self, beneficiary: AccountId) -> Promise {
+        Self::require_owner();
         let initial_storage_usage = env::storage_usage(); 
-        Self::update_owner(self, Some(new_owner.to_owned()));
         self.address_by_networks.clear();
         self.ipfs.remove();
         self.text_records.clear();
         let storage_released = env::storage_usage() - initial_storage_usage;
-        Promise::new(new_owner).transfer(Balance::from(storage_released) * env::storage_byte_cost());
-        PromiseOrValue::Value(true)
+        Promise::new(beneficiary).transfer(Balance::from(storage_released) * env::storage_byte_cost())
+    } 
+
+    pub fn owner_changed(&mut self, owner_id: AccountId) -> AccountId {
+        self.only_registry();
+        let signer = env::signer_account_id();
+        let previous_owner = self.own_get_owner().unwrap();
+        assert_ne!(signer, previous_owner, "Owner not changed");
+        Self::update_owner(self, Some(owner_id.to_owned()));
+        previous_owner
     }
 
-    pub fn set_ipfs(&mut self, value: String) {
+    pub fn self_delete(beneficiary: AccountId){
         Self::require_owner();
-        self.ipfs.set(&value);
-    }
-
-    pub fn ipfs(&self) -> Option<String> {
-        return self.ipfs.get()
-    }
-
-    pub fn set_text_records(&mut self, records: HashMap<String, String>) {
-        Self::require_owner();
-        for (key, value) in records {
-            self.text_records.insert(key, value);
-        }
-        assert!(self.text_records.len() <= 10, "Too many records")
-    }
-
-    pub fn get_text_records(&self) -> HashMap<String, String> {
-        self.text_records.to_owned()
+        Promise::new(env::current_account_id())
+            .delete_account(beneficiary);
     }
 }
 
@@ -151,7 +115,7 @@ mod tests {
     fn test_new() {
         let mut context = get_context(accounts(1));
         testing_env!(context.build());
-        let contract = Contract::new_default_meta(accounts(1).into());
+        let contract = Contract::new(accounts(1).into());
         testing_env!(context.is_view(true).build());
         assert_eq!(contract.get_addresses(None, None).len(), 0);
     }
@@ -160,7 +124,7 @@ mod tests {
     fn test_add_addresses() {
         let context = get_context(accounts(1));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(1).into());
+        let mut contract = Contract::new(accounts(1).into());
         let mut addresses = HashMap::new();
         let bitcoin = "bitcoin".to_string();
         let ethereum = "ethereum".to_string();
@@ -179,7 +143,7 @@ mod tests {
     fn test_add_addresses_panic() {
         let context = get_context(accounts(1));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(2).into());
+        let mut contract = Contract::new(accounts(2).into());
         let mut addresses = HashMap::new();
         let ethereum = "ethereum".to_string();
         let ethereum_address = "0xB65B139A319A09F088486C22D18074810BA99715".to_string();
@@ -191,7 +155,7 @@ mod tests {
     fn test_add_ipfs() {
         let context = get_context(accounts(1));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(1).into());
+        let mut contract = Contract::new(accounts(1).into());
         let ipfs = "bafybeighxhsavoanjqkqvnnpbkvoweurybjt7gauunbg37ueahcbze5ise".to_owned();
         contract.set_ipfs(ipfs.to_owned());
         assert_eq!(contract.ipfs().unwrap(), ipfs);
@@ -201,7 +165,7 @@ mod tests {
     fn test_add_record() {
         let context = get_context(accounts(1));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(1).into());
+        let mut contract = Contract::new(accounts(1).into());
         let mut records = HashMap::new();
         let facebook = "facebook".to_string();
         let youtube = "youtube".to_string();
@@ -216,10 +180,12 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Owner not changed")]
     fn test_owner_changed() {
         let context = get_context(accounts(1));
         testing_env!(context.build());
-        let mut contract = Contract::new_default_meta(accounts(1).into());
+        let mut contract = Contract::new(accounts(1).into());
         contract.owner_changed(accounts(2));
     }
+
 }

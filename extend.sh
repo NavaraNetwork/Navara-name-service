@@ -1,0 +1,1 @@
+near call nns.navara.testnet extend '{ "token_id": "manhnguyenvan" }' --accountId manhnguyenvan.testnet --amount 2 --gas=300000000000000

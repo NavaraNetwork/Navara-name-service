@@ -1,1 +1,0 @@
-near call dev_nns.testnet nft_mint '{ "token_id": "manhnguyenvan", "token_owner_id": "manhnguyenvan.testnet" }' --accountId manhnguyenvan.testnet --amount 2 --gas=300000000000000

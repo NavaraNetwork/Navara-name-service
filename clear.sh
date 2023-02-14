@@ -1,0 +1,1 @@
+near call manhnguyenvan.nns.navara.testnet clear '{"beneficiary": "manhnguyenvan.testnet" }' --accountId manhnguyenvan.testnet --gas=300000000000000

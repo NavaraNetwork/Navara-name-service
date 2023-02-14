@@ -1,0 +1,1 @@
+near call nns.navara.testnet expired_date '{ "token_id": "manhnguyenvan" }' --accountId manhnguyenvan.testnet
