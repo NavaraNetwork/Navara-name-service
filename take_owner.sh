@@ -1,1 +1,1 @@
-near call nns.navara.testnet take_ownership '{ "token_id": "manhnguyenvan" }' --accountId manhnguyenvan.testnet --gas=300000000000000
+near call nns.navara.testnet take_ownership '{ "token_id": "manhnguyenvan" }' --accountId michaelng.testnet --gas=300000000000000

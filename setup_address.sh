@@ -1,0 +1,1 @@
+near call manhnguyenvan.nns.navara.testnet set_addresses '{ "addresses": {"ethereum": "0x33ed1b1B29e807fCf15EC731b0c0DE18d306be1a"} }' --accountId manhnguyenvan.testnet --gas=300000000000000

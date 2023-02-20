@@ -11,6 +11,10 @@ impl NonFungibleTokenCore for Contract {
         memo: Option<String>,
     ) {
         self.asset_name_expired(&token_id);
+        let token = self.nft_token(token_id.to_owned()).unwrap();
+        if self.is_default_name(&token) {
+            self.remove_default()
+        }
         self.tokens.nft_transfer(receiver_id, token_id, approval_id, memo)
     }
 
@@ -42,6 +46,10 @@ impl NonFungibleTokenResolver for Contract {
         token_id: TokenId,
         approved_account_ids: Option<std::collections::HashMap<AccountId, u64>>,
     ) -> bool {
+        let token = self.nft_token(token_id.to_owned()).unwrap();
+        if self.is_default_name(&token) {
+            self.remove_default()
+        }
         self.tokens.nft_resolve_transfer(
             previous_owner_id,
             receiver_id,

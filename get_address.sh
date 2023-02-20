@@ -1,0 +1,1 @@
+near call manhnguyenvan.nns.navara.testnet get_addresses '{ }' --accountId manhnguyenvan.testnet
