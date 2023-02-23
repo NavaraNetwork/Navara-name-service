@@ -37,7 +37,7 @@ impl Contract {
         if let Some(name_expired_date) = self.name_expired_date.get(&token_id) {
             assert!(name_expired_date < env::block_timestamp_ms(), "Unexpired");
         }
-        let deposited = env::attached_deposit() - REGISTER_GAS_DEPOSIT;
+        let deposited = env::attached_deposit() - self.fee_register;
         assert!(deposited >= self.price_for_one_year, "Deposit at least one NEAR");
         let years_extended: u64 = (deposited / self.price_for_one_year).try_into().unwrap();
         let token_metadata = self.metadata_by_token(&token_id);

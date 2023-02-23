@@ -21,9 +21,9 @@ use near_contract_standards::non_fungible_token::core::{NonFungibleTokenCore, No
 
 const RESOLVER_WASM_CODE: &[u8] = include_bytes!("../../out/resolver.wasm");
 
-const ONE_NEAR_YOCTO: Balance = 1_000_000_000_000_000_000_000_000;
+const DEFAULT_ONE_NEAR_YOCTO: Balance = 1_000_000_000_000_000_000_000_000;
 const ONE_YEAR_MILLISECOND: u64 = 31556952000;
-const REGISTER_GAS_DEPOSIT: Balance = ONE_NEAR_YOCTO / 2;
+const DEFAULT_REGISTER_GAS_DEPOSIT: Balance = DEFAULT_ONE_NEAR_YOCTO / 2;
 
 pub use crate::expire::*;
 pub use crate::register::*;
@@ -43,6 +43,7 @@ pub struct Contract {
     tokens: NonFungibleToken,
     metadata: LazyOption<NFTContractMetadata>,
     price_for_one_year: Balance,
+    fee_register: Balance,
     name_expired_date: UnorderedMap<TokenId, u64>,
     default_name: UnorderedMap<AccountId, TokenId>
 }
@@ -62,10 +63,13 @@ enum StorageKey {
 
 #[near_bindgen]
 impl Contract {
+
     /// Initializes the contract owned by `owner_id` with
     /// default metadata (for example purposes only).
     #[init]
-    pub fn new_default_meta(owner_id: AccountId) -> Self {
+    pub fn new_default_meta(
+        owner_id: AccountId
+    ) -> Self {
         Self::new(
             owner_id,
             NFTContractMetadata {
@@ -77,12 +81,18 @@ impl Contract {
                 reference: None,
                 reference_hash: None,
             },
-            ONE_NEAR_YOCTO
+            DEFAULT_ONE_NEAR_YOCTO,
+            DEFAULT_REGISTER_GAS_DEPOSIT
         )
     }
 
     #[init]
-    pub fn new(owner_id: AccountId, metadata: NFTContractMetadata, price_for_one_year: Balance) -> Self {
+    pub fn new(
+        owner_id: AccountId, 
+        metadata: NFTContractMetadata, 
+        price_for_one_year: Balance, 
+        fee_register: Balance
+    ) -> Self {
         require!(!env::state_exists(), "Already initialized");
         metadata.assert_valid();
         let mut contract = Self {
@@ -96,10 +106,23 @@ impl Contract {
             metadata: LazyOption::new(StorageKey::Metadata, Some(&metadata)),
             name_expired_date: UnorderedMap::new(StorageKey::NameExpiredDate),
             default_name: UnorderedMap::new(StorageKey::DefaultName),
-            price_for_one_year
+            price_for_one_year,
+            fee_register
         };
         Owner::init(&mut contract, &owner_id);
         contract
+    }
+
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate(fee_register: Balance) -> Self {
+        // retrieve the current state from the contract
+        let old_state = env::state_read().expect("failed");
+        Self {
+            fee_register,
+            ..old_state
+            
+        }
     }
 
     fn token_owner_only(&self, token_id: &TokenId) -> Token {

@@ -11,7 +11,6 @@ impl Contract {
 
     pub fn set_addresses(&mut self, addresses: HashMap<String, String>) {
         Self::require_owner();
-        Self::require_owner();
         for (key, value) in addresses {
             self.address_by_networks.insert(&key, &value);
         }

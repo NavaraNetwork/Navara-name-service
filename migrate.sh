@@ -2,7 +2,7 @@
 
 near deploy \
     --wasmFile ./out/registry.wasm \
-    --initFunction "new_default_meta" \
+    --initFunction "migrate" \
     --initArgs '{
         "owner_id": "michaelng.testnet"
     }' \
